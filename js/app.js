@@ -73,6 +73,90 @@ function showCtx(e, id) {
   m.style.left = x + 'px'; m.style.top = y + 'px';
 }
 
+// ── Search ─────────────────────────────────────────────────────────────────
+const BUCKET_TINTS_SEARCH = {
+  career:   '#4a7a96', craft: '#a84f22', leverage: '#635878',
+  infra:    '#456b4e', relation: '#8a4a5a',
+};
+
+function highlight(text, term) {
+  if (!term) return text;
+  const re = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+  return text.replace(re, '<mark>$1</mark>');
+}
+
+function renderSearchResults(query) {
+  const resultsEl = document.getElementById('search-results');
+  if (!query.trim()) { resultsEl.classList.remove('open'); return; }
+
+  const q   = query.trim().toLowerCase();
+  const s   = state.getState();
+  const tasks = s.tasks.filter(t => t.title.toLowerCase().includes(q)).slice(0, 8);
+  const ideas = s.ideas.filter(i => i.title.toLowerCase().includes(q)).slice(0, 4);
+
+  if (!tasks.length && !ideas.length) {
+    resultsEl.innerHTML = `<div class="search-empty">No results for "${query}"</div>`;
+    resultsEl.classList.add('open');
+    return;
+  }
+
+  let html = '';
+  if (tasks.length) {
+    html += `<div class="search-group-label">Tasks</div>`;
+    html += tasks.map((t, i) => `
+      <div class="search-result-item" data-search-type="task" data-search-id="${t.id}" data-search-idx="${i}">
+        <span style="width:8px;height:8px;border-radius:50%;background:${BUCKET_TINTS_SEARCH[t.bucket]||'#555'};flex-shrink:0"></span>
+        <span class="search-result-title">${highlight(t.title, query)}</span>
+        <span class="search-result-type">${t.status}</span>
+      </div>`).join('');
+  }
+  if (tasks.length && ideas.length) html += `<div class="search-divider"></div>`;
+  if (ideas.length) {
+    html += `<div class="search-group-label">Ideas</div>`;
+    html += ideas.map((i, idx) => `
+      <div class="search-result-item" data-search-type="idea" data-search-id="${i.id}" data-search-idx="${tasks.length + idx}">
+        <span style="width:8px;height:8px;border-radius:50%;background:${BUCKET_TINTS_SEARCH[i.bucket]||'#555'};flex-shrink:0"></span>
+        <span class="search-result-title">${highlight(i.title, query)}</span>
+        <span class="search-result-type">${i.type}</span>
+      </div>`).join('');
+  }
+
+  resultsEl.innerHTML = html;
+  resultsEl.classList.add('open');
+  focusedSearchIdx = -1;
+}
+
+let focusedSearchIdx = -1;
+
+function navigateSearchResult(dir) {
+  const items = document.querySelectorAll('.search-result-item');
+  if (!items.length) return;
+  items[focusedSearchIdx]?.classList.remove('focused');
+  focusedSearchIdx = (focusedSearchIdx + dir + items.length) % items.length;
+  items[focusedSearchIdx]?.classList.add('focused');
+  items[focusedSearchIdx]?.scrollIntoView({ block: 'nearest' });
+}
+
+function selectSearchResult(el) {
+  if (!el) return;
+  const { searchType, searchId } = el.dataset;
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').classList.remove('open');
+  if (searchType === 'task') {
+    switchTab('board');
+    setTimeout(() => {
+      const card = document.querySelector(`[data-id="${searchId}"][data-type="task-card"]`);
+      if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => card.style.outline = '', 1500); }
+    }, 100);
+  } else {
+    switchTab('ideas');
+    setTimeout(() => {
+      const card = document.querySelector(`.idea-card[data-id="${searchId}"]`);
+      if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => card.style.outline = '', 1500); }
+    }, 100);
+  }
+}
+
 // ── Triage state ───────────────────────────────────────────────────────────
 const triageSel = {};  // { bucket, horizon, type } for current item
 
@@ -205,6 +289,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = e.target.closest('[data-type="task-card"], [data-type="mit-card"]');
     if (!card) return;
     showCtx(e, card.dataset.id);
+  });
+
+  // Search
+  const searchInput   = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  searchInput.addEventListener('input',   e => renderSearchResults(e.target.value));
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown')  { e.preventDefault(); navigateSearchResult(1); }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); navigateSearchResult(-1); }
+    if (e.key === 'Enter')      { selectSearchResult(document.querySelector('.search-result-item.focused') || document.querySelector('.search-result-item')); }
+    if (e.key === 'Escape')     { searchInput.value = ''; searchResults.classList.remove('open'); searchInput.blur(); }
+  });
+  searchResults.addEventListener('click', e => {
+    const item = e.target.closest('.search-result-item');
+    if (item) selectSearchResult(item);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap')) searchResults.classList.remove('open');
+  });
+  // Press '/' to focus search (when not typing elsewhere)
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+      e.preventDefault(); searchInput.focus();
+    }
   });
 });
 

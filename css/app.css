@@ -950,6 +950,90 @@ body {
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+/* ── SEARCH ── */
+.search-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.search-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 14px 7px 32px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  width: 200px;
+  transition: border-color .15s, width .2s, box-shadow .15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8957e' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 10px center;
+}
+.search-input:focus {
+  border-color: var(--accent);
+  width: 260px;
+  box-shadow: 0 0 0 3px rgba(196,98,45,.08);
+}
+.search-input::placeholder { color: var(--text3); }
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(44,36,25,.12);
+  z-index: 600;
+  overflow: hidden;
+  display: none;
+}
+.search-results.open { display: block; }
+
+.search-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text3);
+  text-transform: uppercase;
+  padding: 8px 14px 4px;
+}
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background .1s;
+  font-size: 13px;
+  color: var(--text);
+}
+.search-result-item:hover,
+.search-result-item.focused { background: var(--surface2); }
+.search-result-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-result-title mark {
+  background: rgba(196,98,45,.18);
+  color: var(--accent);
+  border-radius: 2px;
+  font-style: normal;
+}
+.search-result-type {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+.search-empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--text3);
+  text-align: center;
+}
+.search-divider { height: 1px; background: var(--border); margin: 2px 0; }
+
 /* ── EMPTY STATES ── */
 .empty-state {
   display: flex;
