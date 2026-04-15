@@ -1,0 +1,51 @@
+# .github/workflows/deploy.yml
+# GitHub Pages deploy — implemented in Phase 3, Prompt 11.
+# Injects API_BASE and AUTH_TOKEN secrets into index.html at deploy time.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject config into index.html
+        env:
+          API_BASE:   ${{ secrets.API_BASE }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+        run: |
+          sed -i \
+            -e "s|%%API_BASE%%|${API_BASE}|g" \
+            -e "s|%%AUTH_TOKEN%%|${AUTH_TOKEN}|g" \
+            index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

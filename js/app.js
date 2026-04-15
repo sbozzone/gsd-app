@@ -1,0 +1,208 @@
+// js/app.js — main entry point. Wires all modules. ~150 lines.
+import * as state  from './state.js';
+import * as data   from './data.js';
+import * as render from './render.js';
+import { attachDragListeners } from './drag.js';
+import { suggestTriage }       from './triage.js';
+
+// ── Render cycle ───────────────────────────────────────────────────────────
+function renderAll(s) {
+  render.renderToday(s);
+  render.renderBoard(s);
+  render.renderTriage(s);
+  render.renderIdeas(s);
+  render.renderWeekly(s);
+  render.renderSidebar(s);
+  render.renderBadge(s);
+  if (s.ui.focusMode) render.renderFocusMode(s);
+  attachDragListeners();
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+  state.setState({ ui: { currentTab: tab } });
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+const openModal  = () => { document.getElementById('modal-overlay').classList.add('active'); document.getElementById('new-title').focus(); };
+const closeModal = () => document.getElementById('modal-overlay').classList.remove('active');
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Completion animation (Prompt 13) ──────────────────────────────────────
+async function markDone(id) {
+  const card = document.querySelector(`[data-id="${id}"][data-type="task-card"], [data-id="${id}"][data-type="mit-card"]`);
+  if (card) {
+    const title = card.querySelector('.task-card-title, .mit-task-title, .focus-task-title');
+    if (title) { title.style.textDecoration = 'line-through'; title.style.color = '#a8957e'; }
+    card.style.borderColor = '#6a8f72';
+    const check = document.createElement('div');
+    Object.assign(check.style, { position:'absolute', inset:'0', display:'flex', alignItems:'center',
+      justifyContent:'center', fontSize:'28px', animation:'checkPop .3s ease forwards', pointerEvents:'none' });
+    check.textContent = '✓'; card.style.position = 'relative'; card.appendChild(check);
+    setTimeout(() => { card.style.transition = 'opacity .15s, transform .15s'; card.style.opacity = '0'; card.style.transform = 'scale(.95)'; }, 420);
+    setTimeout(() => { card.style.transition = 'max-height .18s, padding .18s'; card.style.maxHeight = '0'; card.style.padding = '0'; card.style.overflow = 'hidden'; }, 570);
+  }
+  setTimeout(async () => {
+    await data.updateTask(id, { status: 'done', is_mit: 0 });
+    await state.loadAll();
+  }, 750);
+}
+
+// ── Context menu ───────────────────────────────────────────────────────────
+let ctxId = null;
+const ctxMenu = () => document.getElementById('ctx-menu');
+const hideCtx = () => ctxMenu().classList.remove('active');
+
+function showCtx(e, id) {
+  e.preventDefault(); ctxId = id;
+  const m = ctxMenu(); m.classList.add('active');
+  const x = Math.min(e.clientX, window.innerWidth  - m.offsetWidth  - 8);
+  const y = Math.min(e.clientY, window.innerHeight - m.offsetHeight - 8);
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+}
+
+// ── Triage state ───────────────────────────────────────────────────────────
+const triageSel = {};  // { bucket, horizon, type } for current item
+
+// ── DOMContentLoaded ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  state.subscribe(renderAll);
+  await state.loadAll();
+
+  // Tab nav
+  document.querySelectorAll('.nav-tab').forEach(b =>
+    b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+  // Add task modal
+  document.getElementById('add-task-btn').addEventListener('click', openModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openModal(); }
+    if (e.key === 'Escape') { closeModal(); hideCtx(); }
+  });
+  document.getElementById('modal-submit').addEventListener('click', async () => {
+    const title = document.getElementById('new-title').value.trim();
+    if (!title) return;
+    await data.createTask({ title,
+      bucket:     document.getElementById('new-bucket').value,
+      horizon:    document.getElementById('new-horizon').value,
+      status:     document.getElementById('new-status').value,
+      size:       document.getElementById('new-size').value,
+      project_id: document.getElementById('new-project').value || null,
+    });
+    closeModal(); document.getElementById('new-title').value = '';
+    await state.loadAll();
+  });
+
+  // Focus mode
+  document.getElementById('focus-toggle').addEventListener('click', () => {
+    const on = !state.getState().ui.focusMode;
+    state.setState({ ui: { focusMode: on } });
+    document.getElementById('focus-overlay').classList.toggle('active', on);
+    document.getElementById('focus-toggle').classList.toggle('active', on);
+    if (on) render.renderFocusMode(state.getState());
+  });
+  document.getElementById('focus-exit').addEventListener('click', () => {
+    state.setState({ ui: { focusMode: false } });
+    document.getElementById('focus-overlay').classList.remove('active');
+    document.getElementById('focus-toggle').classList.remove('active');
+  });
+
+  // Sidebar filters (event delegation — includes dynamically rendered project buttons)
+  document.getElementById('sidebar-projects').addEventListener('click', e => handleFilterClick(e));
+  document.querySelector('.sidebar').addEventListener('click', e => handleFilterClick(e));
+  function handleFilterClick(e) {
+    const btn = e.target.closest('[data-filter-type]');
+    if (!btn) return;
+    state.setState({ ui: { activeFilter: { type: btn.dataset.filterType, value: btn.dataset.filterValue } } });
+  }
+
+  // Ideas filter chips
+  document.getElementById('ideas-filters').addEventListener('click', e => {
+    const chip = e.target.closest('[data-ideas-filter]');
+    if (!chip) return;
+    document.querySelectorAll('[data-ideas-filter]').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.setState({ ui: { ideasFilter: chip.dataset.ideasFilter } });
+  });
+
+  // Global event delegation for action buttons & context menu trigger
+  document.addEventListener('click', async e => {
+    if (!e.target.closest('#ctx-menu')) hideCtx();
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id } = btn.dataset;
+
+    if (action === 'done')         { await markDone(id); return; }
+    if (action === 'mit')          { const mits = state.getState().tasks.filter(t => t.is_mit && t.status !== 'done'); if (mits.length >= 5) { toast('MIT limit is 5 — remove one first'); return; } await data.updateTask(id, { is_mit: 1, status: 'active', horizon: 'now' }); await state.loadAll(); return; }
+    if (action === 'unmit')        { await data.updateTask(id, { is_mit: 0 }); await state.loadAll(); return; }
+    if (action === 'promote-idea') { await data.promoteIdea(id); await state.loadAll(); toast('Promoted to task'); return; }
+    if (action === 'delete-idea')  { if (confirm('Delete this idea?')) { await data.deleteIdea(id); await state.loadAll(); } return; }
+    if (action === 'promote-now')  { await data.updateTask(id, { horizon: 'now' });  await state.loadAll(); return; }
+    if (action === 'promote-next') { await data.updateTask(id, { horizon: 'next' }); await state.loadAll(); return; }
+    if (action === 'triage-skip')  { state.setState({ ui: { triageItemId: null } }); return; }
+    if (action === 'triage-file')  { await doFileInbox(id); return; }
+    if (action === 'triage-select') { await doSelectTriageItem(id); return; }
+    if (action === 'triage-field') return; // handled below via pill clicks
+  });
+
+  // Triage option pills
+  document.getElementById('triage-main').addEventListener('click', e => {
+    const pill = e.target.closest('[data-triage-field]');
+    if (!pill) return;
+    const { triageField, value } = pill.dataset;
+    const field = pill.dataset.triageField;
+    document.querySelectorAll(`[data-triage-field="${field}"]`).forEach(p => p.classList.remove('selected'));
+    pill.classList.add('selected');
+    triageSel[field] = value;
+  });
+
+  // Context menu actions
+  document.getElementById('ctx-mit').addEventListener('click',          async () => { hideCtx(); if (!ctxId) return; const mits = state.getState().tasks.filter(t => t.is_mit); if (mits.length >= 5) { toast('MIT limit is 5'); return; } await data.updateTask(ctxId, { is_mit: 1, status: 'active', horizon: 'now' }); await state.loadAll(); });
+  document.getElementById('ctx-active').addEventListener('click',       async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { status: 'active', horizon: 'now' }); await state.loadAll(); } });
+  document.getElementById('ctx-blocked').addEventListener('click',      async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { status: 'blocked' }); await state.loadAll(); } });
+  document.getElementById('ctx-done').addEventListener('click',         async () => { hideCtx(); if (ctxId) await markDone(ctxId); });
+  document.getElementById('ctx-horizon-now').addEventListener('click',  async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { horizon: 'now' });   await state.loadAll(); } });
+  document.getElementById('ctx-horizon-next').addEventListener('click', async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { horizon: 'next' });  await state.loadAll(); } });
+  document.getElementById('ctx-horizon-later').addEventListener('click',async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { horizon: 'later' }); await state.loadAll(); } });
+  document.getElementById('ctx-delete').addEventListener('click',       async () => { hideCtx(); if (ctxId && confirm('Delete this task?')) { await data.deleteTask(ctxId); await state.loadAll(); } });
+
+  // Right-click on task cards (event delegation)
+  document.addEventListener('contextmenu', e => {
+    const card = e.target.closest('[data-type="task-card"], [data-type="mit-card"]');
+    if (!card) return;
+    showCtx(e, card.dataset.id);
+  });
+});
+
+async function doSelectTriageItem(id) {
+  Object.keys(triageSel).forEach(k => delete triageSel[k]);
+  state.setState({ ui: { triageItemId: Number(id) } });
+  const item = state.getState().inbox.find(x => x.id === Number(id));
+  if (item) {
+    const suggestion = await suggestTriage(item.text);
+    if (suggestion) {
+      Object.assign(triageSel, suggestion);
+      render.applyTriageSuggestion(suggestion);
+    }
+  }
+}
+
+async function doFileInbox(id) {
+  const { bucket, horizon, type } = triageSel;
+  if (!bucket) { toast('Please select a bucket'); return; }
+  await data.fileInboxItem(Number(id), { bucket, horizon: horizon || 'now', type: type || 'task' });
+  Object.keys(triageSel).forEach(k => delete triageSel[k]);
+  state.setState({ ui: { triageItemId: null } });
+  await state.loadAll();
+  toast('Filed ✓');
+}

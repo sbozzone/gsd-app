@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSD — Getting $#!+ Done</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+
+  <!-- Injected at deploy time by GitHub Actions — never hardcode values here -->
+  <script>
+    window.__GSD_CONFIG = {
+      API_BASE:   '%%API_BASE%%',
+      AUTH_TOKEN: '%%AUTH_TOKEN%%',
+    };
+  </script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">GSD<span>GETTING $#!+ DONE</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="today">Today</button>
+    <button class="nav-tab" data-tab="board">Board</button>
+    <button class="nav-tab" data-tab="triage">
+      Triage <span id="triage-badge" class="triage-badge"></span>
+    </button>
+    <button class="nav-tab" data-tab="ideas">Ideas</button>
+    <button class="nav-tab" data-tab="weekly">Weekly</button>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-focus" id="focus-toggle">⚡ FOCUS</button>
+    <button class="btn btn-primary" id="add-task-btn">+ Add Task</button>
+  </div>
+</div>
+
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Buckets</div>
+      <button class="sidebar-item active" data-filter-type="bucket" data-filter-value="all">
+        <span class="dot" style="background:#555"></span> All Buckets
+        <span class="count" id="count-bucket-all"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="bucket" data-filter-value="career">
+        <span class="dot" style="background:var(--career)"></span> Career
+        <span class="count" id="count-bucket-career"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="bucket" data-filter-value="craft">
+        <span class="dot" style="background:var(--craft)"></span> Craft
+        <span class="count" id="count-bucket-craft"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="bucket" data-filter-value="leverage">
+        <span class="dot" style="background:var(--leverage)"></span> Leverage
+        <span class="count" id="count-bucket-leverage"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="bucket" data-filter-value="infra">
+        <span class="dot" style="background:var(--infra)"></span> Life Infra
+        <span class="count" id="count-bucket-infra"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="bucket" data-filter-value="relation">
+        <span class="dot" style="background:var(--relation)"></span> Relationships
+        <span class="count" id="count-bucket-relation"></span>
+      </button>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Horizon</div>
+      <button class="sidebar-item" data-filter-type="horizon" data-filter-value="now">
+        <span style="font-size:10px;color:var(--now-color)">●</span> Now
+        <span class="count" id="count-horizon-now"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="horizon" data-filter-value="next">
+        <span style="font-size:10px;color:var(--next-color)">●</span> Next
+        <span class="count" id="count-horizon-next"></span>
+      </button>
+      <button class="sidebar-item" data-filter-type="horizon" data-filter-value="later">
+        <span style="font-size:10px;color:var(--later-color)">●</span> Later
+        <span class="count" id="count-horizon-later"></span>
+      </button>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Projects</div>
+      <div id="sidebar-projects"><!-- rendered by render.js --></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- TODAY PANEL -->
+    <div id="panel-today" class="panel active">
+      <div class="view-header">
+        <div class="view-title">TODAY</div>
+        <div class="view-subtitle" id="today-date"></div>
+      </div>
+      <div class="today-layout">
+        <div class="mit-column">
+          <div class="mit-header">
+            <div class="mit-label">MITs</div>
+            <div class="mit-sublabel">MOST IMPORTANT TASKS · MAX 5</div>
+          </div>
+          <div class="mit-list" id="mit-list"><!-- rendered by render.js --></div>
+          <div class="mit-wip-bar">
+            <div class="mit-wip-track">
+              <div class="mit-wip-fill" id="mit-fill" style="width:0%"></div>
+            </div>
+            <div class="mit-wip-label" id="mit-wip-label">0 / 5 COMMITTED</div>
+          </div>
+        </div>
+        <div class="active-column">
+          <div class="active-header">
+            <div class="active-label">ACTIVE TASKS</div>
+            <div class="view-subtitle">DRAG TO MIT COLUMN TO PROMOTE</div>
+          </div>
+          <div class="active-list" id="active-list"><!-- rendered by render.js --></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOARD PANEL -->
+    <div id="panel-board" class="panel">
+      <div class="view-header">
+        <div class="view-title">MASTER BOARD</div>
+        <div class="view-subtitle" id="board-subtitle">ALL BUCKETS</div>
+      </div>
+      <div class="kanban-layout" id="kanban-layout"><!-- rendered by render.js --></div>
+    </div>
+
+    <!-- TRIAGE PANEL -->
+    <div id="panel-triage" class="panel">
+      <div class="view-header">
+        <div class="view-title">MORNING TRIAGE</div>
+        <div class="view-subtitle">AI-ASSISTED · PROCESS YOUR INBOX</div>
+      </div>
+      <div class="triage-layout">
+        <div class="triage-queue">
+          <div class="triage-queue-header">
+            <div class="triage-queue-label">INBOX</div>
+            <span class="inbox-badge" id="inbox-count">0</span>
+          </div>
+          <div class="triage-queue-list" id="inbox-list"><!-- rendered by render.js --></div>
+        </div>
+        <div class="triage-main" id="triage-main"><!-- rendered by render.js --></div>
+      </div>
+    </div>
+
+    <!-- IDEAS PANEL -->
+    <div id="panel-ideas" class="panel">
+      <div class="view-header">
+        <div class="view-title">IDEA SHELF</div>
+        <div class="view-subtitle">CAPTURE WITHOUT COMMITMENT</div>
+      </div>
+      <div class="ideas-filters" id="ideas-filters">
+        <button class="filter-chip active" data-ideas-filter="all">All</button>
+        <button class="filter-chip" data-ideas-filter="idea">Ideas</button>
+        <button class="filter-chip" data-ideas-filter="someday">Someday / Maybe</button>
+        <button class="filter-chip" data-ideas-filter="career">Career</button>
+        <button class="filter-chip" data-ideas-filter="craft">Craft</button>
+        <button class="filter-chip" data-ideas-filter="leverage">Leverage</button>
+      </div>
+      <div class="ideas-layout" id="ideas-list"><!-- rendered by render.js --></div>
+    </div>
+
+    <!-- WEEKLY PANEL -->
+    <div id="panel-weekly" class="panel">
+      <div class="view-header">
+        <div class="view-title">WEEKLY RESET</div>
+        <div class="view-subtitle">REVIEW · PROMOTE · PRUNE</div>
+      </div>
+      <div class="week-layout" id="weekly-layout"><!-- rendered by render.js --></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOCUS OVERLAY -->
+<div class="focus-overlay" id="focus-overlay">
+  <div class="focus-title">FOCUS MODE — MITS ONLY</div>
+  <div class="focus-tasks" id="focus-tasks"><!-- rendered by render.js --></div>
+  <button class="focus-exit" id="focus-exit">✕ EXIT FOCUS</button>
+</div>
+
+<!-- ADD TASK MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title">ADD TASK</div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input class="form-input" id="new-title" placeholder="What needs to get done?" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Bucket</label>
+        <select class="form-select" id="new-bucket">
+          <option value="career">Career</option>
+          <option value="craft">Craft</option>
+          <option value="leverage">Leverage</option>
+          <option value="infra">Life Infra</option>
+          <option value="relation">Relationships</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Horizon</label>
+        <select class="form-select" id="new-horizon">
+          <option value="now">Now</option>
+          <option value="next">Next</option>
+          <option value="later">Later</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="new-status">
+          <option value="backlog">Backlog</option>
+          <option value="active">Active</option>
+          <option value="blocked">Blocked</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Size</label>
+        <select class="form-select" id="new-size">
+          <option value="S">Small (&lt;15 min)</option>
+          <option value="M" selected>Medium (1–2 hrs)</option>
+          <option value="L">Large (multi-session)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Project (optional)</label>
+      <select class="form-select" id="new-project">
+        <option value="">— none —</option>
+        <!-- populated from state.projects by render.js -->
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-submit">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctx-menu">
+  <div class="ctx-item" id="ctx-mit">⚡ Set as MIT</div>
+  <div class="ctx-item" id="ctx-active">▶ Move to Active</div>
+  <div class="ctx-item" id="ctx-blocked">⛔ Mark Blocked</div>
+  <div class="ctx-item" id="ctx-done">✓ Mark Done</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item ctx-horizon-now" id="ctx-horizon-now">● Move to Now</div>
+  <div class="ctx-item ctx-horizon-next" id="ctx-horizon-next">● Move to Next</div>
+  <div class="ctx-item ctx-horizon-later" id="ctx-horizon-later">● Move to Later</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item ctx-delete" id="ctx-delete">✕ Delete</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

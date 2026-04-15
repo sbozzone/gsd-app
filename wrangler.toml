@@ -1,0 +1,12 @@
+name            = "gsd-worker"
+main            = "worker/index.js"
+compatibility_date = "2026-04-13"
+workers_dev        = true
+
+[[d1_databases]]
+binding  = "DB"
+database_name = "gsd-db"
+database_id   = "4b690142-8929-4b0a-9ce7-eb5c5fe7204c"
+
+# AUTH_TOKEN is a secret — never hardcode here.
+# Set it with: wrangler secret put AUTH_TOKEN
