@@ -25,9 +25,13 @@ function switchTab(tab) {
   state.setState({ ui: { currentTab: tab } });
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────
+// ── Add Task Modal ─────────────────────────────────────────────────────────
 const openModal  = () => { document.getElementById('modal-overlay').classList.add('active'); document.getElementById('new-title').focus(); };
 const closeModal = () => document.getElementById('modal-overlay').classList.remove('active');
+
+// ── Capture Modal ──────────────────────────────────────────────────────────
+const openCapture  = () => { document.getElementById('capture-overlay').classList.add('active'); document.getElementById('capture-text').focus(); };
+const closeCapture = () => { document.getElementById('capture-overlay').classList.remove('active'); document.getElementById('capture-text').value = ''; };
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 function toast(msg) {
@@ -87,7 +91,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
   document.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openModal(); }
-    if (e.key === 'Escape') { closeModal(); hideCtx(); }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'i') { e.preventDefault(); openCapture(); }
+    if (e.key === 'Escape') { closeModal(); closeCapture(); hideCtx(); }
   });
   document.getElementById('modal-submit').addEventListener('click', async () => {
     const title = document.getElementById('new-title').value.trim();
@@ -101,6 +106,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     closeModal(); document.getElementById('new-title').value = '';
     await state.loadAll();
+  });
+
+  // Capture modal
+  document.getElementById('capture-btn').addEventListener('click', openCapture);
+  document.getElementById('capture-cancel').addEventListener('click', closeCapture);
+  document.getElementById('capture-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeCapture(); });
+  document.getElementById('capture-submit').addEventListener('click', async () => {
+    const text = document.getElementById('capture-text').value.trim();
+    if (!text) return;
+    await data.addToInbox(text, 'manual', null);
+    closeCapture();
+    await state.loadAll();
+    toast('Captured ✓');
+  });
+  document.getElementById('capture-text').addEventListener('keydown', async e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('capture-submit').click();
+    }
   });
 
   // Focus mode
