@@ -50,6 +50,7 @@ function applyFilter(tasks, filter) {
 
 function taskCard(task, projects, { showMitBtn = false } = {}) {
   const mitBtn  = showMitBtn ? `<button class="task-action-btn" data-action="mit" data-id="${task.id}">⚡ MIT</button>` : '';
+  const editBtn = `<button class="task-action-btn" data-action="edit-task" data-id="${task.id}">✎</button>`;
   const doneBtn = `<button class="task-action-btn" data-action="done" data-id="${task.id}">✓</button>`;
   const isMit   = task.is_mit ? ' is-mit' : '';
   return `<div class="task-card${isMit}" draggable="true"
@@ -63,7 +64,7 @@ function taskCard(task, projects, { showMitBtn = false } = {}) {
         ${projectTag(task.project_id, projects)}
       </div>
     </div>
-    <div class="task-card-actions">${mitBtn}${doneBtn}</div>
+    <div class="task-card-actions">${mitBtn}${editBtn}${doneBtn}</div>
   </div>`;
 }
 
@@ -272,8 +273,9 @@ export function renderIdeas(state) {
         ${i.note ? `<div style="font-size:12px;color:var(--text3)">${esc(i.note)}</div>` : ''}
         <div class="idea-card-footer">
           ${bucketTag(i.bucket)}
-          <button class="task-action-btn" data-action="promote-idea" data-id="${i.id}"
-            style="margin-left:auto">→ Task</button>
+          <button class="task-action-btn" data-action="edit-idea" data-id="${i.id}"
+            style="margin-left:auto">✎</button>
+          <button class="task-action-btn" data-action="promote-idea" data-id="${i.id}">→ Task</button>
           <button class="task-action-btn" data-action="delete-idea" data-id="${i.id}">✕</button>
         </div>
       </div>`).join('')

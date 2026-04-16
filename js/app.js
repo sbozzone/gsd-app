@@ -60,6 +60,42 @@ async function markDone(id) {
   }, 750);
 }
 
+// ── Edit Modal ─────────────────────────────────────────────────────────────
+let editMode = null; // 'task' | 'idea'
+let editId   = null;
+
+function openEditTask(id) {
+  const task = state.getState().tasks.find(t => t.id === Number(id));
+  if (!task) return;
+  editMode = 'task'; editId = Number(id);
+  document.getElementById('edit-modal-title').textContent = 'EDIT TASK';
+  document.getElementById('edit-title').value = task.title;
+  document.getElementById('edit-type-group').style.display = 'none';
+  const conv = document.getElementById('edit-convert');
+  conv.textContent = '→ Idea'; conv.style.display = '';
+  document.getElementById('edit-overlay').classList.add('active');
+  document.getElementById('edit-title').focus();
+}
+
+function openEditIdea(id) {
+  const idea = state.getState().ideas.find(i => i.id === Number(id));
+  if (!idea) return;
+  editMode = 'idea'; editId = Number(id);
+  document.getElementById('edit-modal-title').textContent = 'EDIT IDEA';
+  document.getElementById('edit-title').value = idea.title;
+  document.getElementById('edit-type').value = idea.type || 'idea';
+  document.getElementById('edit-type-group').style.display = '';
+  const conv = document.getElementById('edit-convert');
+  conv.textContent = '→ Task'; conv.style.display = '';
+  document.getElementById('edit-overlay').classList.add('active');
+  document.getElementById('edit-title').focus();
+}
+
+function closeEdit() {
+  document.getElementById('edit-overlay').classList.remove('active');
+  editMode = null; editId = null;
+}
+
 // ── Context menu ───────────────────────────────────────────────────────────
 let ctxId = null;
 const ctxMenu = () => document.getElementById('ctx-menu');
@@ -176,7 +212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openModal(); }
     if ((e.metaKey || e.ctrlKey) && e.key === 'i') { e.preventDefault(); openCapture(); }
-    if (e.key === 'Escape') { closeModal(); closeCapture(); hideCtx(); }
+    if (e.key === 'Escape') { closeModal(); closeCapture(); closeEdit(); hideCtx(); }
   });
   document.getElementById('modal-submit').addEventListener('click', async () => {
     const title = document.getElementById('new-title').value.trim();
@@ -251,8 +287,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { action, id } = btn.dataset;
 
     if (action === 'done')         { await markDone(id); return; }
+    if (action === 'edit-task')    { openEditTask(id); return; }
     if (action === 'mit')          { const mits = state.getState().tasks.filter(t => t.is_mit && t.status !== 'done'); if (mits.length >= 5) { toast('MIT limit is 5 — remove one first'); return; } await data.updateTask(id, { is_mit: 1, status: 'active', horizon: 'now' }); await state.loadAll(); return; }
     if (action === 'unmit')        { await data.updateTask(id, { is_mit: 0 }); await state.loadAll(); return; }
+    if (action === 'edit-idea')    { openEditIdea(id); return; }
     if (action === 'promote-idea') { await data.promoteIdea(id); await state.loadAll(); toast('Promoted to task'); return; }
     if (action === 'delete-idea')  { if (confirm('Delete this idea?')) { await data.deleteIdea(id); await state.loadAll(); } return; }
     if (action === 'promote-now')  { await data.updateTask(id, { horizon: 'now' });  await state.loadAll(); return; }
@@ -274,7 +312,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     triageSel[field] = value;
   });
 
+  // Edit modal
+  document.getElementById('edit-cancel').addEventListener('click', closeEdit);
+  document.getElementById('edit-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeEdit(); });
+  document.getElementById('edit-title').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('edit-save').click(); });
+  document.getElementById('edit-save').addEventListener('click', async () => {
+    const title = document.getElementById('edit-title').value.trim();
+    if (!title) return;
+    if (editMode === 'task') {
+      await data.updateTask(editId, { title });
+    } else {
+      const type = document.getElementById('edit-type').value;
+      await data.updateIdea(editId, { title, type });
+    }
+    closeEdit(); await state.loadAll(); toast('Saved ✓');
+  });
+  document.getElementById('edit-convert').addEventListener('click', async () => {
+    const title = document.getElementById('edit-title').value.trim() || null;
+    if (editMode === 'task') {
+      const task = state.getState().tasks.find(t => t.id === editId);
+      await data.createIdea({ title: title || task.title, bucket: task.bucket, type: 'idea' });
+      await data.deleteTask(editId);
+      closeEdit(); await state.loadAll(); toast('Converted to idea');
+    } else {
+      await data.promoteIdea(editId);
+      closeEdit(); await state.loadAll(); toast('Promoted to task');
+    }
+  });
+
   // Context menu actions
+  document.getElementById('ctx-edit').addEventListener('click',         () => { hideCtx(); if (ctxId) openEditTask(ctxId); });
   document.getElementById('ctx-mit').addEventListener('click',          async () => { hideCtx(); if (!ctxId) return; const mits = state.getState().tasks.filter(t => t.is_mit); if (mits.length >= 5) { toast('MIT limit is 5'); return; } await data.updateTask(ctxId, { is_mit: 1, status: 'active', horizon: 'now' }); await state.loadAll(); });
   document.getElementById('ctx-active').addEventListener('click',       async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { status: 'active', horizon: 'now' }); await state.loadAll(); } });
   document.getElementById('ctx-blocked').addEventListener('click',      async () => { hideCtx(); if (ctxId) { await data.updateTask(ctxId, { status: 'blocked' }); await state.loadAll(); } });
