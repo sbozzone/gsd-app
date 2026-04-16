@@ -34,14 +34,30 @@ const openCapture  = () => { document.getElementById('capture-overlay').classLis
 const closeCapture = () => { document.getElementById('capture-overlay').classList.remove('active'); document.getElementById('capture-text').value = ''; };
 
 // ── Toast ──────────────────────────────────────────────────────────────────
-function toast(msg) {
+let _toastTimer = null;
+function toast(msg, undoFn) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  if (_toastTimer) clearTimeout(_toastTimer);
+  if (undoFn) {
+    t.innerHTML = `<span>${msg}</span><button class="toast-undo-btn" id="toast-undo">Undo</button>`;
+    t.classList.add('show', 'toast-undo');
+    document.getElementById('toast-undo').onclick = () => { undoFn(); t.classList.remove('show', 'toast-undo'); };
+    _toastTimer = setTimeout(() => t.classList.remove('show', 'toast-undo'), 5000);
+  } else {
+    t.innerHTML = `<span>${msg}</span>`;
+    t.classList.remove('toast-undo');
+    t.classList.add('show');
+    _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
 }
 
 // ── Completion animation (Prompt 13) ──────────────────────────────────────
 async function markDone(id) {
+  // Capture previous state for undo before any changes
+  const prev = state.getState().tasks.find(t => t.id === Number(id));
+  const prevStatus = prev?.status || 'backlog';
+  const prevIsMit  = prev?.is_mit  || 0;
+
   const card = document.querySelector(`[data-id="${id}"][data-type="task-card"], [data-id="${id}"][data-type="mit-card"]`);
   if (card) {
     const title = card.querySelector('.task-card-title, .mit-task-title, .focus-task-title');
@@ -57,6 +73,11 @@ async function markDone(id) {
   setTimeout(async () => {
     await data.updateTask(id, { status: 'done', is_mit: 0 });
     await state.loadAll();
+    toast('Task done ✓', async () => {
+      await data.updateTask(id, { status: prevStatus, is_mit: prevIsMit });
+      await state.loadAll();
+      toast('Undone');
+    });
   }, 750);
 }
 

@@ -947,8 +947,24 @@ body {
   transition: all .2s;
   pointer-events: none;
   box-shadow: 0 4px 16px rgba(44,36,25,.2);
+  display: flex; align-items: center; gap: 10px;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
+.toast.show.toast-undo { pointer-events: auto; }
+.toast-undo-btn {
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.35);
+  color: var(--surface);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.toast-undo-btn:hover { background: rgba(255,255,255,.28); }
 
 /* ── SEARCH ── */
 .search-wrap {
