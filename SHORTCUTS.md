@@ -52,6 +52,7 @@ Input: `Reminders`
 | Headers | `Content-Type` = `application/json` |
 | Headers | `Authorization` = `Bearer YOUR_AUTH_TOKEN` |
 | Request Body | JSON |
+| **Allow Error Responses** | **On** ← required so 4xx responses are returned instead of crashing |
 
 **JSON Body** (use the JSON body type in Shortcuts):
 ```json
@@ -70,11 +71,15 @@ Input: `Reminders`
 ---
 
 #### 3b. If the POST succeeded — mark reminder complete
+
+Check whether the `data` key in the response has a value. This is more reliable than
+checking `error` because JSON `null` values can behave inconsistently across iOS versions.
+
 | Field | Value |
 |---|---|
 | Action | **If** |
-| Input | `APIResponse` → **Dictionary** → Key: `error` |
-| Condition | is null / does not have value |
+| Input | `APIResponse` → **Dictionary** → Key: `data` |
+| Condition | **has any value** |
 
 **Inside the If block:**
 
@@ -91,7 +96,16 @@ Input: `Reminders`
 | Name | `SyncedCount` |
 | Value | `SyncedCount` + `1` *(use Calculate action: SyncedCount + 1)* |
 
-**Otherwise** (End If): do nothing — item stays incomplete, no duplicate.
+**Otherwise** (sync failed — show which item failed):
+
+**Action: Show Notification**
+| Field | Value |
+|---|---|
+| Action | **Show Notification** |
+| Title | `GSD Sync Failed` |
+| Body | `Could not sync: ` + `Repeat Item · Title` |
+
+> This makes auth or network failures visible so you know what went wrong.
 
 ---
 
@@ -118,8 +132,41 @@ Input: `Reminders`
 
 ---
 
+## Troubleshooting
+
+### Items not appearing in GSD after running the Shortcut
+
+1. **Check the sync notification** — it shows how many items were synced. If it says `0`, the
+   Shortcut ran but all POSTs failed. If you see "GSD Sync Failed" alerts, auth or network is
+   the issue.
+
+2. **Verify your AUTH_TOKEN** — the token in the Shortcut header must exactly match the
+   Cloudflare secret. Test connectivity:
+   ```
+   curl -X POST https://gsd-worker.sbozzone.workers.dev/api/inbox \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -d '{"text":"test item","source":"reminders","reminders_id":"test-123"}'
+   ```
+   A 401 response means the token is wrong.
+
+3. **Confirm the Reminders list name** — it must be named exactly `GSD Inbox`
+   (case-sensitive, no extra spaces).
+
+4. **Refresh the GSD app** — after the Shortcut runs, open the GSD app and go to the
+   Triage tab. Tap the **↻ Sync** button to pull the latest inbox items, or simply reload
+   the page. The app also auto-refreshes whenever you switch back to the browser tab.
+
+5. **Check "Allow Error Responses"** — in the "Get Contents of URL" action, make sure
+   "Allow Error Responses" is turned **On**. Without this, a 401 response crashes the
+   Shortcut silently and nothing syncs.
+
+---
+
 ## Notes
 
-- The `reminders_id` field uses Apple's internal Reminder identifier to prevent duplicate imports if the Shortcut runs twice before you triage.
-- The Worker returns the existing inbox record (not an error) if a reminder was already imported — so the Shortcut correctly marks it complete on the second run too.
+- The `reminders_id` field uses Apple's internal Reminder identifier to prevent duplicate
+  imports if the Shortcut runs twice before you triage.
+- The Worker returns the existing inbox record (not an error) if a reminder was already
+  imported — so the Shortcut correctly marks it complete on the second run too.
 - Completed reminders stay in your Reminders app history; they just won't re-import.

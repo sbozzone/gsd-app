@@ -103,6 +103,11 @@ export default {
       // ── AI SUGGEST ──
       if (path === '/api/suggest' && method === 'POST') return handleSuggest(request, env);
 
+      // ── HEALTH ──
+      if (path === '/api/health' && method === 'GET') {
+        return json({ status: 'ok', ts: new Date().toISOString() });
+      }
+
       return err('Not found', 404);
     } catch (e) {
       return err(e.message || 'Internal error', 500);
