@@ -257,6 +257,8 @@
 
 <!-- CONTEXT MENU -->
 <div class="ctx-menu" id="ctx-menu">
+  <div class="ctx-item" id="ctx-edit">✎ Edit</div>
+  <div class="ctx-divider"></div>
   <div class="ctx-item" id="ctx-mit">⚡ Set as MIT</div>
   <div class="ctx-item" id="ctx-active">▶ Move to Active</div>
   <div class="ctx-item" id="ctx-blocked">⛔ Mark Blocked</div>
@@ -267,6 +269,29 @@
   <div class="ctx-item ctx-horizon-later" id="ctx-horizon-later">● Move to Later</div>
   <div class="ctx-divider"></div>
   <div class="ctx-item ctx-delete" id="ctx-delete">✕ Delete</div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="modal-title" id="edit-modal-title">EDIT</div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input class="form-input" id="edit-title" />
+    </div>
+    <div class="form-group" id="edit-type-group" style="display:none">
+      <label class="form-label">Type</label>
+      <select class="form-select" id="edit-type">
+        <option value="idea">Idea</option>
+        <option value="someday">Someday / Maybe</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="edit-cancel">Cancel</button>
+      <button class="btn btn-ghost" id="edit-convert" style="display:none"></button>
+      <button class="btn btn-primary" id="edit-save">Save</button>
+    </div>
+  </div>
 </div>
 
 <!-- CAPTURE MODAL -->

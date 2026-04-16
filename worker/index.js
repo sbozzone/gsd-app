@@ -75,6 +75,7 @@ export default {
       const ideaMatch = path.match(/^\/api\/ideas\/(\d+)$/);
       if (ideaMatch) {
         const id = Number(ideaMatch[1]);
+        if (method === 'PATCH')  return handleUpdateIdea(id, request, env);
         if (method === 'DELETE') return handleDeleteIdea(id, request, env);
       }
       const ideaPromoteMatch = path.match(/^\/api\/ideas\/(\d+)\/promote$/);
@@ -302,6 +303,30 @@ async function handleCreateIdea(request, env) {
   const row = await env.DB.prepare(`SELECT * FROM ideas WHERE id = ?`)
     .bind(result.meta.last_row_id).first();
   return json(row, 201);
+}
+
+async function handleUpdateIdea(id, request, env) {
+  const deny = requireAuth(request, env);
+  if (deny) return deny;
+
+  const body = await request.json();
+  const fields = ['title', 'type', 'bucket', 'note'];
+  const updates = [];
+  const values  = [];
+
+  for (const f of fields) {
+    if (f in body) { updates.push(`${f} = ?`); values.push(body[f]); }
+  }
+  if (updates.length === 0) return err('No fields to update');
+
+  values.push(id);
+  await env.DB.prepare(
+    `UPDATE ideas SET ${updates.join(', ')} WHERE id = ?`
+  ).bind(...values).run();
+
+  const row = await env.DB.prepare(`SELECT * FROM ideas WHERE id = ?`).bind(id).first();
+  if (!row) return err('Not found', 404);
+  return json(row);
 }
 
 async function handleDeleteIdea(id, request, env) {

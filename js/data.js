@@ -35,6 +35,7 @@ export const updateProject   = (id, patch) => req('PATCH',  `/api/projects/${id}
 // ── Ideas ──────────────────────────────────────────────────────────────────
 export const fetchIdeas      = ()          => req('GET',    '/api/ideas');
 export const createIdea      = (payload)   => req('POST',   '/api/ideas', payload);
+export const updateIdea      = (id, patch) => req('PATCH',  `/api/ideas/${id}`, patch);
 export const deleteIdea      = (id)        => req('DELETE', `/api/ideas/${id}`);
 export const promoteIdea     = (id)        => req('PATCH',  `/api/ideas/${id}/promote`);
 
