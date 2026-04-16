@@ -247,6 +247,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Inbox refresh button (triage panel)
+  document.getElementById('inbox-refresh-btn').addEventListener('click', async () => {
+    await state.loadAll();
+    toast('Inbox refreshed');
+  });
+
   // Focus mode
   document.getElementById('focus-toggle').addEventListener('click', () => {
     const on = !state.getState().ui.focusMode;
@@ -356,6 +362,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = e.target.closest('[data-type="task-card"], [data-type="mit-card"]');
     if (!card) return;
     showCtx(e, card.dataset.id);
+  });
+
+  // Auto-refresh inbox when the browser tab regains focus (handles the case where
+  // the iOS Shortcut ran in the background while the GSD app was already open).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') state.loadAll();
   });
 
   // Search
